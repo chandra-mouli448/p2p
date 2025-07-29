@@ -90,7 +90,7 @@
     <p id="status"></p>
   </div>
 
-  <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <script>
     let provider;
     let signer;
@@ -107,26 +107,40 @@
     ];
 
     async function connectWallet() {
+      if (typeof window.ethereum === "undefined") {
+        document.getElementById("status").innerText = "❌ MetaMask not found. Please install it!";
+        return;
+      }
+
       try {
         provider = new ethers.providers.Web3Provider(window.ethereum);
         await provider.send("eth_requestAccounts", []);
         signer = provider.getSigner();
         contract = new ethers.Contract(contractAddress, abi, signer);
         const account = await signer.getAddress();
-        document.getElementById("account").innerText = "Connected: " + account;
+        document.getElementById("account").innerText = "✅ Connected: " + account;
+        document.getElementById("status").innerText = "✅ Wallet connected successfully!";
       } catch (err) {
-        document.getElementById("status").innerText = "Wallet connection failed!";
+        console.error(err);
+        document.getElementById("status").innerText = "❌ Wallet connection failed: " + (err.message || err);
       }
     }
 
     async function offerLoan() {
       const offerAmount = document.getElementById("offerAmount").value;
       const collateralAmount = document.getElementById("collateralAmount").value;
+
+      if (!offerAmount || !collateralAmount) {
+        document.getElementById("status").innerText = "❌ Enter both loan and collateral amounts!";
+        return;
+      }
+
       try {
         const tx = await contract.offerLoan(
           ethers.utils.parseEther(collateralAmount),
           { value: ethers.utils.parseEther(offerAmount) }
         );
+        document.getElementById("status").innerText = "⏳ Waiting for transaction...";
         await tx.wait();
         document.getElementById("status").innerText = "✅ Loan offered successfully!";
       } catch (err) {
@@ -138,9 +152,15 @@
     async function takeLoan() {
       try {
         const loan = await contract.loan();
+        if (!loan || loan.collateral.eq(0)) {
+          document.getElementById("status").innerText = "❌ No loan available to take!";
+          return;
+        }
+
         const tx = await contract.takeLoan({
           value: loan.collateral.toString()
         });
+        document.getElementById("status").innerText = "⏳ Waiting for transaction...";
         await tx.wait();
         document.getElementById("status").innerText = "✅ Loan taken successfully!";
       } catch (err) {
@@ -152,16 +172,6 @@
     async function repayLoan() {
       try {
         const loan = await contract.loan();
-        const tx = await contract.repayLoan({
-          value: loan.amount.toString()
-        });
-        await tx.wait();
-        document.getElementById("status").innerText = "✅ Loan repaid successfully!";
-      } catch (err) {
-        console.error(err);
-        document.getElementById("status").innerText = "❌ Error: " + (err.message || err);
-      }
-    }
-  </script>
-</body>
-</html>
+        if (!loan || loan.amount.eq(0)) {
+          document.getElementById("status").innerText = "❌ No active loan to repay!";
+          ret
