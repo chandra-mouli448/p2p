@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Simple Lending DApp</title>
+</head>
+<body>
+  <h2>Simple Lending DApp</h2>
+  
+  <button onclick="connectWallet()">Connect Wallet</button>
+  <p id="account"></p>
+  
+  <h3>1️⃣ Offer Loan</h3>
+  <input type="number" id="offerAmount" placeholder="Loan Amount (ETH)">
+  <input type="number" id="collateralAmount" placeholder="Collateral (ETH)">
+  <button onclick="offerLoan()">Offer Loan</button>
+  
+  <h3>2️⃣ Take Loan</h3>
+  <button onclick="takeLoan()">Take Loan (Pay Collateral)</button>
+  
+  <h3>3️⃣ Repay Loan</h3>
+  <button onclick="repayLoan()">Repay Loan</button>
+
+  <p id="status"></p>
+  
+  <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" type="application/javascript"></script>
+  <script>
+    let provider;
+    let signer;
+    let contract;
+
+    // Replace this with your deployed contract address
+    const contractAddress = "YOUR_CONTRACT_ADDRESS_HERE";
+
+    // Contract ABI (simplified)
+    const abi = [
+      "function offerLoan(uint256 _collateral) external payable",
+      "function takeLoan() external payable",
+      "function repayLoan() external payable",
+      "function loan() view returns (address lender, address borrower, uint256 amount, uint256 collateral, bool taken, bool repaid)"
+    ];
+
+    async function connectWallet() {
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      signer = provider.getSigner();
+      contract = new ethers.Contract(contractAddress, abi, signer);
+      const account = await signer.getAddress();
+      document.getElementById("account").innerText = "Connected: " + account;
+    }
+
+    async function offerLoan() {
+      const offerAmount = document.getElementById("offerAmount").value;
+      const collateralAmount = document.getElementById("collateralAmount").value;
+      try {
+        const tx = await contract.offerLoan(
+          ethers.utils.parseEther(collateralAmount),
+          { value: ethers.utils.parseEther(offerAmount) }
+        );
+        await tx.wait();
+        document.getElementById("status").innerText = "Loan offered successfully!";
+      } catch (err) {
+        console.error(err);
+        document.getElementById("status").innerText = "Error: " + err.message;
+      }
+    }
+
+    async function takeLoan() {
+      try {
+        const loan = await contract.loan();
+        const tx = await contract.takeLoan({
+          value: loan.collateral.toString()
+        });
+        await tx.wait();
+        document.getElementById("status").innerText = "Loan taken successfully!";
+      } catch (err) {
+        console.error(err);
+        document.getElementById("status").innerText = "Error: " + err.message;
+      }
+    }
+
+    async function repayLoan() {
+      try {
+        const loan = await contract.loan();
+        const tx = await contract.repayLoan({
+          value: loan.amount.toString()
+        });
+        await tx.wait();
+        document.getElementById("status").innerText = "Loan repaid successfully!";
+      } catch (err) {
+        console.error(err);
+        document.getElementById("status").innerText = "Error: " + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
